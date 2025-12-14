@@ -1,5 +1,11 @@
 .PHONY: run build test migrate-up migrate-down docker-up docker-down deps lint
 
+# Load environment variables from .env file
+ifneq (,$(wildcard ./.env))
+    include .env
+    export
+endif
+
 # Development
 run:
 	go run main.go
