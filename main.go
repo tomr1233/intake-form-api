@@ -62,8 +62,16 @@ func main() {
 	// Initialize analyzer service
 	analyzer := services.NewAnalyzer(geminiClient, submissionRepo, analysisRepo)
 
+	// Initialize email service
+	emailService := services.NewEmailService(cfg.Email)
+	if emailService.IsEnabled() {
+		log.Println("Email notifications enabled")
+	} else {
+		log.Println("Email notifications disabled (RESEND_API_KEY or NOTIFICATION_EMAIL not set)")
+	}
+
 	// Initialize handlers
-	handler := handlers.NewHandler(submissionRepo, analysisRepo, analyzer, cfg)
+	handler := handlers.NewHandler(submissionRepo, analysisRepo, analyzer, emailService, cfg)
 	healthHandler := handlers.NewHealthHandler(db)
 
 	// Set up Gin router

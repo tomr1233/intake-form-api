@@ -41,6 +41,9 @@ func (h *Handler) CreateSubmission(c *gin.Context) {
 		return
 	}
 
+	// Send email notification (async, fire and forget)
+	h.email.SendSubmissionNotificationAsync(submission)
+
 	// Trigger async analysis (fire and forget)
 	h.analyzer.AnalyzeAsync(submission)
 

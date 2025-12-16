@@ -14,6 +14,7 @@ type Handler struct {
 	submissions repository.SubmissionRepository
 	analysis    repository.AnalysisRepository
 	analyzer    *services.Analyzer
+	email       *services.EmailService
 	config      *config.Config
 }
 
@@ -22,12 +23,14 @@ func NewHandler(
 	submissions repository.SubmissionRepository,
 	analysis repository.AnalysisRepository,
 	analyzer *services.Analyzer,
+	email *services.EmailService,
 	cfg *config.Config,
 ) *Handler {
 	return &Handler{
 		submissions: submissions,
 		analysis:    analysis,
 		analyzer:    analyzer,
+		email:       email,
 		config:      cfg,
 	}
 }

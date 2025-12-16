@@ -11,6 +11,7 @@ type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
 	Gemini   GeminiConfig
+	Email    EmailConfig
 }
 
 type ServerConfig struct {
@@ -25,6 +26,12 @@ type DatabaseConfig struct {
 
 type GeminiConfig struct {
 	APIKey string
+}
+
+type EmailConfig struct {
+	ResendAPIKey      string
+	NotificationEmail string
+	BaseURL           string
 }
 
 // Load loads configuration from environment variables.
@@ -44,6 +51,11 @@ func Load() (*Config, error) {
 		},
 		Gemini: GeminiConfig{
 			APIKey: os.Getenv("GEMINI_API_KEY"),
+		},
+		Email: EmailConfig{
+			ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
+			NotificationEmail: os.Getenv("NOTIFICATION_EMAIL"),
+			BaseURL:           getEnv("BASE_URL", "http://localhost:8080"),
 		},
 	}
 
