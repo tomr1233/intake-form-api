@@ -60,9 +60,9 @@ type Submission struct {
 
 // CreateSubmissionRequest represents the JSON request body for creating a submission.
 type CreateSubmissionRequest struct {
-	FirstName                string `json:"firstName" binding:"required,min=1,max=100"`
+	FirstName                string `json:"firstName" binding:"max=100"`
 	LastName                 string `json:"lastName" binding:"max=100"`
-	Email                    string `json:"email" binding:"required,email"`
+	Email                    string `json:"email" binding:"omitempty,email,max=255"`
 	Website                  string `json:"website" binding:"max=255"`
 	CompanyName              string `json:"companyName" binding:"max=255"`
 	ReasonForBooking         string `json:"reasonForBooking"`
