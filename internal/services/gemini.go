@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/tomr1233/intake-form-api/internal/models"
@@ -12,41 +13,12 @@ import (
 
 const systemInstruction = "You are an expert sales analyst. Be direct, critical, and strategic. Do not fluff the response."
 
-const promptTemplate = `You are a world-class business consultant and sales strategist. Analyze this intake form and provide strategic insights.
+const promptIntro = `You are a world-class business consultant and sales strategist. Analyze this intake form and provide strategic insights.
 
-## Prospect Information
+Note: Only the information provided below was submitted. Analyze based on the available data. If critical information is missing, note that in your analysis.
+`
 
-**Contact:** %s %s (%s)
-**Company:** %s
-**Website:** %s
-
-## Why They're Booking
-%s
-
-## How They Found Us
-%s
-
-## Financials
-- Current Revenue: %s
-- Team Size: %s
-- Average Deal Size: %s
-- Marketing Budget: %s
-
-## Their Business
-- Primary Service: %s
-- Decision Maker: %s
-
-## Current Challenges
-%s
-
-## Previous Agency Experience
-%s
-
-## Future Goals
-- Desired Outcome: %s
-- Desired Speed: %s
-- Ready to Scale: %s
-
+const promptOutro = `
 ---
 
 Analyze this prospect and provide a JSON response with:
@@ -195,22 +167,120 @@ func (g *GeminiClient) Analyze(ctx context.Context, s *models.Submission) (*mode
 }
 
 func (g *GeminiClient) buildPrompt(s *models.Submission) string {
-	return fmt.Sprintf(promptTemplate,
-		s.FirstName, s.LastName, s.Email,
-		s.CompanyName,
-		s.Website,
-		s.ReasonForBooking,
-		s.HowDidYouHear,
-		s.CurrentRevenue,
-		s.TeamSize,
-		s.AverageDealSize,
-		s.MarketingBudget,
-		s.PrimaryService,
-		s.IsDecisionMaker,
-		s.BiggestBottleneck,
-		s.PreviousAgencyExperience,
-		s.DesiredOutcome,
-		s.DesiredSpeed,
-		s.ReadyToScale,
-	)
+	var b strings.Builder
+	b.WriteString(promptIntro)
+
+	// Prospect Information
+	var contact []string
+	if s.FirstName != "" || s.LastName != "" {
+		contact = append(contact, fmt.Sprintf("**Contact:** %s %s", s.FirstName, s.LastName))
+	}
+	if s.Email != "" {
+		contact = append(contact, fmt.Sprintf("**Email:** %s", s.Email))
+	}
+	if s.CompanyName != "" {
+		contact = append(contact, fmt.Sprintf("**Company:** %s", s.CompanyName))
+	}
+	if s.Website != "" {
+		contact = append(contact, fmt.Sprintf("**Website:** %s", s.Website))
+	}
+	if len(contact) > 0 {
+		b.WriteString("\n## Prospect Information\n")
+		b.WriteString(strings.Join(contact, "\n"))
+		b.WriteString("\n")
+	}
+
+	// Why They're Booking
+	if s.ReasonForBooking != "" {
+		b.WriteString("\n## Why They're Booking\n")
+		b.WriteString(s.ReasonForBooking)
+		b.WriteString("\n")
+	}
+
+	// How They Found Us
+	if s.HowDidYouHear != "" {
+		b.WriteString("\n## How They Found Us\n")
+		b.WriteString(s.HowDidYouHear)
+		b.WriteString("\n")
+	}
+
+	// Financials
+	var financials []string
+	if s.CurrentRevenue != "" {
+		financials = append(financials, fmt.Sprintf("- Current Revenue: %s", s.CurrentRevenue))
+	}
+	if s.TeamSize != "" {
+		financials = append(financials, fmt.Sprintf("- Team Size: %s", s.TeamSize))
+	}
+	if s.AverageDealSize != "" {
+		financials = append(financials, fmt.Sprintf("- Average Deal Size: %s", s.AverageDealSize))
+	}
+	if s.MarketingBudget != "" {
+		financials = append(financials, fmt.Sprintf("- Marketing Budget: %s", s.MarketingBudget))
+	}
+	if len(financials) > 0 {
+		b.WriteString("\n## Financials\n")
+		b.WriteString(strings.Join(financials, "\n"))
+		b.WriteString("\n")
+	}
+
+	// Their Business
+	var business []string
+	if s.PrimaryService != "" {
+		business = append(business, fmt.Sprintf("- Primary Service: %s", s.PrimaryService))
+	}
+	if s.IsDecisionMaker != "" {
+		business = append(business, fmt.Sprintf("- Decision Maker: %s", s.IsDecisionMaker))
+	}
+	if s.AcquisitionSource != "" {
+		business = append(business, fmt.Sprintf("- Acquisition Source: %s", s.AcquisitionSource))
+	}
+	if s.SalesProcess != "" {
+		business = append(business, fmt.Sprintf("- Sales Process: %s", s.SalesProcess))
+	}
+	if s.FulfillmentWorkflow != "" {
+		business = append(business, fmt.Sprintf("- Fulfillment Workflow: %s", s.FulfillmentWorkflow))
+	}
+	if s.CurrentTechStack != "" {
+		business = append(business, fmt.Sprintf("- Current Tech Stack: %s", s.CurrentTechStack))
+	}
+	if len(business) > 0 {
+		b.WriteString("\n## Their Business\n")
+		b.WriteString(strings.Join(business, "\n"))
+		b.WriteString("\n")
+	}
+
+	// Current Challenges
+	if s.BiggestBottleneck != "" {
+		b.WriteString("\n## Current Challenges\n")
+		b.WriteString(s.BiggestBottleneck)
+		b.WriteString("\n")
+	}
+
+	// Previous Agency Experience
+	if s.PreviousAgencyExperience != "" {
+		b.WriteString("\n## Previous Agency Experience\n")
+		b.WriteString(s.PreviousAgencyExperience)
+		b.WriteString("\n")
+	}
+
+	// Future Goals
+	var goals []string
+	if s.DesiredOutcome != "" {
+		goals = append(goals, fmt.Sprintf("- Desired Outcome: %s", s.DesiredOutcome))
+	}
+	if s.DesiredSpeed != "" {
+		goals = append(goals, fmt.Sprintf("- Desired Speed: %s", s.DesiredSpeed))
+	}
+	if s.ReadyToScale != "" {
+		goals = append(goals, fmt.Sprintf("- Ready to Scale: %s", s.ReadyToScale))
+	}
+	if len(goals) > 0 {
+		b.WriteString("\n## Future Goals\n")
+		b.WriteString(strings.Join(goals, "\n"))
+		b.WriteString("\n")
+	}
+
+	b.WriteString(promptOutro)
+	return b.String()
 }

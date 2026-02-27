@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -22,6 +23,18 @@ func (h *Handler) CreateSubmission(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.respondErrorSimple(c, http.StatusBadRequest, "Invalid request: "+err.Error())
 		return
+	}
+
+	// Read name and email from query parameters
+	if name := c.Query("name"); name != "" {
+		parts := strings.SplitN(name, " ", 2)
+		req.FirstName = parts[0]
+		if len(parts) > 1 {
+			req.LastName = parts[1]
+		}
+	}
+	if email := c.Query("email"); email != "" {
+		req.Email = email
 	}
 
 	// Generate secure admin token
