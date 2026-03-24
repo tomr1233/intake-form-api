@@ -45,4 +45,4 @@ jobs:
       - name: Rebuild containers
         run: |
           ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "cd ${{ secrets.DEPLOY_PATH }} && docker compose -f docker-compose.prod.yml up -d --build --force-recreate && docker image prune -f"
+            "cd ${{ secrets.DEPLOY_PATH }} && docker compose -f docker-compose.prod.yml down && docker compose -f docker-compose.prod.yml up -d --build && docker image prune -f"
