@@ -71,9 +71,36 @@ type UpdateWebhookRequest struct {
 	Active *bool    `json:"active,omitempty"`
 }
 
+// WebhookResponse is the standard read-only representation of a webhook.
+// It deliberately has no Secret field so handlers cannot accidentally leak it.
+type WebhookResponse struct {
+	ID           uuid.UUID `json:"id"`
+	Name         string    `json:"name"`
+	URL          string    `json:"url"`
+	SecretPrefix string    `json:"secretPrefix"`
+	Events       []string  `json:"events"`
+	Active       bool      `json:"active"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+}
+
+// ToResponse converts a Webhook to its safe, secret-free response shape.
+func (w *Webhook) ToResponse() WebhookResponse {
+	return WebhookResponse{
+		ID:           w.ID,
+		Name:         w.Name,
+		URL:          w.URL,
+		SecretPrefix: w.SecretPrefix,
+		Events:       w.Events,
+		Active:       w.Active,
+		CreatedAt:    w.CreatedAt,
+		UpdatedAt:    w.UpdatedAt,
+	}
+}
+
 // WebhookWithSecretResponse is returned ONLY by create and rotate-secret.
 type WebhookWithSecretResponse struct {
-	Webhook
+	WebhookResponse
 	Secret string `json:"secret"`
 }
 
