@@ -15,7 +15,7 @@ import (
 // silently allow access.
 func AdminAuth(expectedKey string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if expectedKey == "" {
+		if strings.TrimSpace(expectedKey) == "" {
 			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{
 				"error": "admin api key not configured",
 			})

@@ -22,6 +22,7 @@ func TestAdminAuth(t *testing.T) {
 		{"correct key", "secret", "Bearer secret", http.StatusOK},
 		{"missing bearer prefix", "secret", "secret", http.StatusUnauthorized},
 		{"empty config disables feature", "", "Bearer anything", http.StatusServiceUnavailable},
+		{"whitespace-only config disables feature", "   ", "Bearer    ", http.StatusServiceUnavailable},
 	}
 
 	for _, tc := range cases {
