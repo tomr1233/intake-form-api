@@ -97,7 +97,7 @@ func (r *webhookDeliveryRepo) List(ctx context.Context, webhookID uuid.UUID, bef
 			       created_at, updated_at
 			FROM webhook_deliveries
 			WHERE webhook_id = $1
-			  AND created_at < (SELECT created_at FROM webhook_deliveries WHERE id = $2)
+			  AND created_at < (SELECT created_at FROM webhook_deliveries WHERE id = $2 AND webhook_id = $1)
 			ORDER BY created_at DESC
 			LIMIT $3`, webhookID, *before, limit)
 	}
