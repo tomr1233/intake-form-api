@@ -38,6 +38,9 @@ func validateWebhookURL(raw string) error {
 	if u.Host == "" {
 		return errors.New("url host is required")
 	}
+	if u.User != nil {
+		return errors.New("url must not contain userinfo")
+	}
 	return nil
 }
 
@@ -48,6 +51,9 @@ func isPrivateAddr(ip net.IP) bool {
 		return true // be conservative
 	}
 	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+		return true
+	}
+	if ip.IsMulticast() {
 		return true
 	}
 	// IsPrivate covers RFC1918 + RFC4193 (fc00::/7).

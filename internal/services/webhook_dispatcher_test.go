@@ -37,6 +37,10 @@ func TestIsPrivateAddr(t *testing.T) {
 		{"fe80::1", true},
 		{"2001:db8::1", false},
 		{"::ffff:127.0.0.1", true},
+		{"::ffff:100.64.0.1", true},  // CGNAT mapped IPv6
+		{"::ffff:1.2.3.4", false},    // public mapped IPv6
+		{"224.0.0.1", true},          // multicast
+		{"239.255.255.255", true},    // multicast
 	}
 	for _, tc := range cases {
 		t.Run(tc.ip, func(t *testing.T) {
@@ -64,6 +68,7 @@ func TestValidateWebhookURL(t *testing.T) {
 		{"no host", "http:///hook", true},
 		{"empty", "", true},
 		{"malformed", "://bad", true},
+		{"with userinfo", "http://user:pass@example.com/hook", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
