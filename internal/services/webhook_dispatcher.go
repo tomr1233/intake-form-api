@@ -70,6 +70,9 @@ func NewDispatcher(
 	if len(opts.BackoffSchedule) == 0 {
 		opts.BackoffSchedule = []time.Duration{5 * time.Second, 30 * time.Second, 2 * time.Minute}
 	}
+	if len(opts.BackoffSchedule) != maxAttempts-1 {
+		panic(fmt.Sprintf("webhook dispatcher: BackoffSchedule must have %d entries, got %d", maxAttempts-1, len(opts.BackoffSchedule)))
+	}
 
 	dialer := &net.Dialer{Timeout: opts.RequestTimeout}
 	allowPrivate := opts.AllowPrivateIPs
@@ -94,6 +97,9 @@ func NewDispatcher(
 					}
 				}
 			}
+			// Dial the IP literal (not the hostname) so the kernel can't re-resolve.
+			// Without this pinning, an attacker-controlled DNS could swap a public
+			// IP for a private one between the guard above and the dial here.
 			return dialer.DialContext(ctx, network, net.JoinHostPort(ips[0].String(), port))
 		},
 	}
