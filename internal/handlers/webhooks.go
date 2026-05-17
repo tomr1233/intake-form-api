@@ -252,3 +252,85 @@ func parseListLimit(c *gin.Context) int {
 	}
 	return n
 }
+
+// ListWebhookDeliveries handles GET /api/webhooks/:id/deliveries.
+func (h *Handler) ListWebhookDeliveries(c *gin.Context) {
+	webhookID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		h.respondErrorSimple(c, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	// Confirm the webhook exists so we 404 instead of returning an empty list.
+	if _, err := h.webhooks.GetByID(c.Request.Context(), webhookID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			h.notFound(c)
+			return
+		}
+		h.internalError(c)
+		return
+	}
+
+	var before *uuid.UUID
+	if raw := c.Query("before"); raw != "" {
+		parsed, err := uuid.Parse(raw)
+		if err != nil {
+			h.respondErrorSimple(c, http.StatusBadRequest, "invalid before cursor")
+			return
+		}
+		before = &parsed
+	}
+
+	limit := parseListLimit(c)
+	rows, err := h.webhookDeliveries.List(c.Request.Context(), webhookID, before, limit)
+	if err != nil {
+		h.internalError(c)
+		return
+	}
+
+	summaries := make([]models.DeliverySummary, 0, len(rows))
+	for _, d := range rows {
+		summaries = append(summaries, models.DeliverySummary{
+			ID:             d.ID,
+			WebhookID:      d.WebhookID,
+			EventType:      d.EventType,
+			EventID:        d.EventID,
+			Status:         d.Status,
+			Attempts:       d.Attempts,
+			LastStatusCode: d.LastStatusCode,
+			NextAttemptAt:  d.NextAttemptAt,
+			CreatedAt:      d.CreatedAt,
+			UpdatedAt:      d.UpdatedAt,
+		})
+	}
+	h.respondData(c, http.StatusOK, summaries)
+}
+
+// GetWebhookDelivery handles GET /api/webhooks/:id/deliveries/:deliveryId.
+func (h *Handler) GetWebhookDelivery(c *gin.Context) {
+	webhookID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		h.respondErrorSimple(c, http.StatusBadRequest, "invalid webhook id")
+		return
+	}
+	deliveryID, err := uuid.Parse(c.Param("deliveryId"))
+	if err != nil {
+		h.respondErrorSimple(c, http.StatusBadRequest, "invalid delivery id")
+		return
+	}
+	d, err := h.webhookDeliveries.GetByID(c.Request.Context(), deliveryID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			h.notFound(c)
+			return
+		}
+		h.internalError(c)
+		return
+	}
+	if d.WebhookID != webhookID {
+		// Don't leak existence of deliveries on other webhooks.
+		h.notFound(c)
+		return
+	}
+	h.respondData(c, http.StatusOK, d)
+}
