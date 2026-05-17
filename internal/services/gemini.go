@@ -8,8 +8,12 @@ import (
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/tomr1233/intake-form-api/internal/models"
+	"github.com/tomr1233/intake-form-api/internal/observability"
+	"go.opentelemetry.io/otel/codes"
 	"google.golang.org/api/option"
 )
+
+const geminiModelName = "gemini-2.5-flash"
 
 const systemInstruction = "You are an expert sales analyst. Be direct, critical, and strategic. Do not fluff the response."
 
@@ -44,7 +48,7 @@ func NewGeminiClient(ctx context.Context, apiKey string) (*GeminiClient, error) 
 		return nil, fmt.Errorf("creating genai client: %w", err)
 	}
 
-	model := client.GenerativeModel("gemini-2.5-flash")
+	model := client.GenerativeModel(geminiModelName)
 	model.SystemInstruction = &genai.Content{
 		Parts: []genai.Part{
 			genai.Text(systemInstruction),
@@ -117,20 +121,42 @@ func (g *GeminiClient) Close() error {
 func (g *GeminiClient) Analyze(ctx context.Context, s *models.Submission) (*models.AnalysisResult, error) {
 	prompt := g.buildPrompt(s)
 
+	ctx, span := observability.Tracer().Start(ctx, "gemini.GenerateContent")
+	defer span.End()
+	observability.MarkGeneration(span, "gemini", geminiModelName)
+	observability.SetObservationInput(span, prompt)
+
 	resp, err := g.model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "GenerateContent failed")
 		return nil, fmt.Errorf("generating content: %w", err)
 	}
 
+	if usage := resp.UsageMetadata; usage != nil {
+		observability.SetUsage(span,
+			int(usage.PromptTokenCount),
+			int(usage.CandidatesTokenCount),
+			int(usage.TotalTokenCount),
+		)
+	}
+
 	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		return nil, fmt.Errorf("empty response from Gemini")
+		err := fmt.Errorf("empty response from Gemini")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
 
 	// Extract the text response
 	textPart, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response type from Gemini")
+		err := fmt.Errorf("unexpected response type from Gemini")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
+	observability.SetObservationOutput(span, string(textPart))
 
 	// Parse JSON response
 	var result struct {
