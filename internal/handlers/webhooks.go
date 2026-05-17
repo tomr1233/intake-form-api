@@ -23,7 +23,11 @@ func (h *Handler) CreateWebhook(c *gin.Context) {
 		h.respondErrorSimple(c, http.StatusBadRequest, "invalid request: "+err.Error())
 		return
 	}
-	if err := validateURLAndEvents(req.URL, req.Events); err != nil {
+	if err := validateWebhookURLString(req.URL); err != nil {
+		h.respondErrorSimple(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validateEvents(req.Events); err != nil {
 		h.respondErrorSimple(c, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -111,16 +115,14 @@ func (h *Handler) UpdateWebhook(c *gin.Context) {
 		return
 	}
 	if req.URL != nil {
-		if err := validateURLAndEvents(*req.URL, nil); err != nil {
+		if err := validateWebhookURLString(*req.URL); err != nil {
 			h.respondErrorSimple(c, http.StatusBadRequest, err.Error())
 			return
 		}
 	}
-	if req.Events != nil {
-		if err := validateURLAndEvents("http://placeholder.invalid", req.Events); err != nil {
-			h.respondErrorSimple(c, http.StatusBadRequest, err.Error())
-			return
-		}
+	if err := validateEvents(req.Events); err != nil {
+		h.respondErrorSimple(c, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	upd := repository.WebhookUpdate{
@@ -195,9 +197,9 @@ func generateWebhookSecret() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// validateURLAndEvents enforces http/https scheme + known event types.
-// Pass nil events to skip event validation.
-func validateURLAndEvents(rawURL string, events []string) error {
+// validateWebhookURLString enforces http/https scheme, non-empty host, and
+// no userinfo. Matches the dispatcher's URL contract.
+func validateWebhookURLString(rawURL string) error {
 	if rawURL == "" {
 		return errors.New("url is required")
 	}
@@ -212,14 +214,23 @@ func validateURLAndEvents(rawURL string, events []string) error {
 	if u.Host == "" {
 		return errors.New("url host is required")
 	}
-	if events != nil {
-		if len(events) == 0 {
-			return errors.New("events must not be empty")
-		}
-		for _, e := range events {
-			if !models.KnownEventTypes[e] {
-				return errors.New("unknown event type: " + e)
-			}
+	if u.User != nil {
+		return errors.New("url must not contain userinfo")
+	}
+	return nil
+}
+
+// validateEvents enforces non-empty + known event types. Pass nil to skip.
+func validateEvents(events []string) error {
+	if events == nil {
+		return nil
+	}
+	if len(events) == 0 {
+		return errors.New("events must not be empty")
+	}
+	for _, e := range events {
+		if !models.KnownEventTypes[e] {
+			return errors.New("unknown event type: " + e)
 		}
 	}
 	return nil
