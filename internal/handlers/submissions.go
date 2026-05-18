@@ -60,6 +60,11 @@ func (h *Handler) CreateSubmission(c *gin.Context) {
 	// Trigger async analysis (fire and forget)
 	h.analyzer.AnalyzeAsync(submission)
 
+	// Dispatch form.submission to all active webhooks (fire-and-forget).
+	if h.webhookDispatcher != nil {
+		h.webhookDispatcher.DispatchAsync(submissionID, models.EventTypeFormSubmission, submission)
+	}
+
 	// Return immediately with submission ID and admin URL
 	h.respondData(c, http.StatusCreated, CreateSubmissionResponse{
 		ID:       submissionID,
