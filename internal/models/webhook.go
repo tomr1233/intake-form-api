@@ -57,7 +57,7 @@ type WebhookDelivery struct {
 // CreateWebhookRequest is the JSON body for POST /api/webhooks.
 type CreateWebhookRequest struct {
 	Name   string   `json:"name" binding:"required,min=1,max=100"`
-	URL    string   `json:"url" binding:"required"`
+	URL    string   `json:"url" binding:"required,max=2048"`
 	Events []string `json:"events"`
 	Active *bool    `json:"active,omitempty"` // pointer so omission => default true
 }
@@ -66,7 +66,7 @@ type CreateWebhookRequest struct {
 // All fields are optional; nil means "leave unchanged".
 type UpdateWebhookRequest struct {
 	Name   *string  `json:"name,omitempty" binding:"omitempty,min=1,max=100"`
-	URL    *string  `json:"url,omitempty"`
+	URL    *string  `json:"url,omitempty" binding:"omitempty,max=2048"`
 	Events []string `json:"events,omitempty"`
 	Active *bool    `json:"active,omitempty"`
 }
