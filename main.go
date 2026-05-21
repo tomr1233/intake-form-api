@@ -27,16 +27,13 @@ const serviceName = "intake-form-api"
 var serviceVersion = "dev"
 
 func main() {
-	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Set Gin mode
 	gin.SetMode(cfg.Server.GinMode)
 
-	// Set up context with cancellation for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -68,7 +65,6 @@ func main() {
 	defer db.Close()
 	log.Println("Database connected successfully")
 
-	// Initialize Gemini client
 	log.Println("Initializing Gemini client...")
 	geminiClient, err := services.NewGeminiClient(ctx, cfg.Gemini.APIKey)
 	if err != nil {
@@ -81,33 +77,43 @@ func main() {
 	}()
 	log.Println("Gemini client initialized successfully")
 
-	// Initialize repositories
+	// Repositories
 	submissionRepo := repository.NewSubmissionRepository(db)
 	analysisRepo := repository.NewAnalysisRepository(db)
+	webhookRepo := repository.NewWebhookRepository(db)
+	webhookDeliveryRepo := repository.NewWebhookDeliveryRepository(db)
 
-	// Initialize analyzer service
+	// Services
 	analyzer := services.NewAnalyzer(geminiClient, submissionRepo, analysisRepo)
-
-	// Initialize email service
 	emailService := services.NewEmailService(cfg.Email)
 	if emailService.IsEnabled() {
 		log.Println("Email notifications enabled")
 	} else {
 		log.Println("Email notifications disabled (RESEND_API_KEY or NOTIFICATION_EMAIL not set)")
 	}
+	dispatcher := services.NewDispatcher(webhookRepo, webhookDeliveryRepo, services.DispatcherOptions{
+		AllowPrivateIPs: cfg.Webhook.AllowPrivateIPs,
+	})
+	if cfg.Webhook.AdminAPIKey == "" {
+		log.Println("Webhook admin API disabled (ADMIN_API_KEY not set) — /api/webhooks routes will return 503")
+	} else {
+		log.Println("Webhook admin API enabled")
+	}
 
-	// Initialize handlers
-	handler := handlers.NewHandler(submissionRepo, analysisRepo, analyzer, emailService, cfg)
+	// Handlers
+	handler := handlers.NewHandler(
+		submissionRepo, analysisRepo, analyzer, emailService, cfg,
+		webhookRepo, webhookDeliveryRepo, dispatcher,
+	)
 	healthHandler := handlers.NewHealthHandler(db)
 
-	// Set up Gin router
+	// Router
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(otelgin.Middleware(serviceName))
 	router.Use(middleware.Logging())
 	router.Use(middleware.CORS(cfg.Server.FrontendURL))
 
-	// Routes
 	router.GET("/health", healthHandler.Health)
 
 	api := router.Group("/api")
@@ -115,9 +121,22 @@ func main() {
 		api.POST("/submissions", handler.CreateSubmission)
 		api.GET("/admin/:token", handler.GetAdminResults)
 		api.GET("/admin/:token/status", handler.GetAdminStatus)
+
+		// Webhook management — admin-key protected.
+		webhooks := api.Group("/webhooks")
+		webhooks.Use(middleware.AdminAuth(cfg.Webhook.AdminAPIKey))
+		{
+			webhooks.POST("", handler.CreateWebhook)
+			webhooks.GET("", handler.ListWebhooks)
+			webhooks.GET("/:id", handler.GetWebhook)
+			webhooks.PATCH("/:id", handler.UpdateWebhook)
+			webhooks.DELETE("/:id", handler.DeleteWebhook)
+			webhooks.POST("/:id/rotate-secret", handler.RotateWebhookSecret)
+			webhooks.GET("/:id/deliveries", handler.ListWebhookDeliveries)
+			webhooks.GET("/:id/deliveries/:deliveryId", handler.GetWebhookDelivery)
+		}
 	}
 
-	// Start server with graceful shutdown
 	srv := &http.Server{
 		Addr:         ":" + cfg.Server.Port,
 		Handler:      router,
@@ -126,7 +145,6 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Start server in goroutine
 	go func() {
 		log.Printf("Server starting on port %s", cfg.Server.Port)
 		log.Printf("Frontend URL: %s", cfg.Server.FrontendURL)
@@ -135,20 +153,15 @@ func main() {
 		}
 	}()
 
-	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	log.Println("Shutting down server...")
-
-	// Give outstanding requests 5 seconds to complete
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Fatal("Server forced to shutdown:", err)
 	}
-
 	log.Println("Server exited")
 }

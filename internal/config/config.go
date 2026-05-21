@@ -12,6 +12,7 @@ type Config struct {
 	Database DatabaseConfig
 	Gemini   GeminiConfig
 	Email    EmailConfig
+	Webhook  WebhookConfig
 }
 
 type ServerConfig struct {
@@ -32,6 +33,11 @@ type EmailConfig struct {
 	ResendAPIKey      string
 	NotificationEmail string
 	BaseURL           string
+}
+
+type WebhookConfig struct {
+	AdminAPIKey     string
+	AllowPrivateIPs bool
 }
 
 // Load loads configuration from environment variables.
@@ -56,6 +62,10 @@ func Load() (*Config, error) {
 			ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
 			NotificationEmail: os.Getenv("NOTIFICATION_EMAIL"),
 			BaseURL:           getEnv("BASE_URL", "http://localhost:8080"),
+		},
+		Webhook: WebhookConfig{
+			AdminAPIKey:     os.Getenv("ADMIN_API_KEY"),
+			AllowPrivateIPs: getEnv("WEBHOOK_ALLOW_PRIVATE_IPS", "false") == "true",
 		},
 	}
 
