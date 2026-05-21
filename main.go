@@ -15,9 +15,16 @@ import (
 	"github.com/tomr1233/intake-form-api/internal/database"
 	"github.com/tomr1233/intake-form-api/internal/handlers"
 	"github.com/tomr1233/intake-form-api/internal/middleware"
+	"github.com/tomr1233/intake-form-api/internal/observability"
 	"github.com/tomr1233/intake-form-api/internal/repository"
 	"github.com/tomr1233/intake-form-api/internal/services"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
+
+const serviceName = "intake-form-api"
+
+// serviceVersion is overridden at build time via -ldflags "-X main.serviceVersion=...".
+var serviceVersion = "dev"
 
 func main() {
 	cfg, err := config.Load()
@@ -30,6 +37,26 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Initialize Langfuse/OTEL tracing. No-op when LANGFUSE_PUBLIC_KEY /
+	// LANGFUSE_SECRET_KEY are unset.
+	shutdownTracer, tracingEnabled, err := observability.Setup(ctx, serviceName, serviceVersion)
+	if err != nil {
+		log.Fatalf("Failed to initialize tracing: %v", err)
+	}
+	if tracingEnabled {
+		log.Println("Langfuse tracing enabled")
+	} else {
+		log.Println("Langfuse tracing disabled (LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY not set)")
+	}
+	defer func() {
+		flushCtx, flushCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer flushCancel()
+		if err := shutdownTracer(flushCtx); err != nil {
+			log.Printf("Error flushing traces: %v", err)
+		}
+	}()
+
+	// Initialize database
 	log.Println("Connecting to database...")
 	db, err := database.New(ctx, cfg.Database.URL)
 	if err != nil {
@@ -83,6 +110,7 @@ func main() {
 	// Router
 	router := gin.New()
 	router.Use(gin.Recovery())
+	router.Use(otelgin.Middleware(serviceName))
 	router.Use(middleware.Logging())
 	router.Use(middleware.CORS(cfg.Server.FrontendURL))
 

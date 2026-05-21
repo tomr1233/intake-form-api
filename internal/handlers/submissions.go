@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -40,6 +41,7 @@ func (h *Handler) CreateSubmission(c *gin.Context) {
 	// Generate secure admin token
 	adminToken, err := tokens.GenerateSecureToken(32)
 	if err != nil {
+		log.Printf("ERROR: failed to generate admin token: %v", err)
 		h.internalError(c)
 		return
 	}
@@ -50,6 +52,7 @@ func (h *Handler) CreateSubmission(c *gin.Context) {
 
 	// Save to database
 	if err := h.submissions.Create(c.Request.Context(), submission); err != nil {
+		log.Printf("ERROR: failed to create submission %s: %v", submissionID, err)
 		h.internalError(c)
 		return
 	}
