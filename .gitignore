@@ -1,0 +1,11 @@
+# Environment files (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+
+# Build output
+out/
+
+# OS / editor
+.DS_Store
+.idea/
