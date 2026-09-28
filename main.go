@@ -105,7 +105,6 @@ func main() {
 		submissionRepo, analysisRepo, analyzer, emailService, cfg,
 		webhookRepo, webhookDeliveryRepo, dispatcher,
 	)
-	healthHandler := handlers.NewHealthHandler(db)
 
 	// Router
 	router := gin.New()
@@ -114,7 +113,7 @@ func main() {
 	router.Use(middleware.Logging())
 	router.Use(middleware.CORS(cfg.Server.FrontendURL))
 
-	router.GET("/health", healthHandler.Health)
+	router.GET("/health", handlers.Health)
 
 	api := router.Group("/api")
 	{
