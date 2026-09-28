@@ -21,7 +21,9 @@ func New(ctx context.Context, connString string) (*DB, error) {
 
 	// Configure pool settings
 	config.MaxConns = 25
-	config.MinConns = 5
+	// No idle floor: held-open or recycled connections keep waking the Neon
+	// compute, so it could never scale to zero between real requests.
+	config.MinConns = 0
 	config.MaxConnLifetime = time.Hour
 	config.MaxConnIdleTime = 30 * time.Minute
 
@@ -44,9 +46,4 @@ func (db *DB) Close() {
 	if db.Pool != nil {
 		db.Pool.Close()
 	}
-}
-
-// Health checks if the database connection is healthy.
-func (db *DB) Health(ctx context.Context) error {
-	return db.Pool.Ping(ctx)
 }
