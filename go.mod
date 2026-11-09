@@ -1,12 +1,12 @@
 module github.com/tomr1233/intake-form-api
 
-go 1.25.0
+go 1.26.10
 
 require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/generative-ai-go v0.20.1
 	github.com/google/uuid v1.6.0
-	github.com/jackc/pgx/v5 v5.7.6
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/joho/godotenv v1.5.1
 	github.com/resend/resend-go/v2 v2.28.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin v0.68.0
