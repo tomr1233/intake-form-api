@@ -1,6 +1,5 @@
-# Build, scan, push to GHCR. The cluster (Flux, gh:tomr1233/expressnext-k8s) deploys the newest
-# main-<sha7>-<unix-ts> tag within ~10 min, so a push to main is a deploy.
-# Pull requests build and scan only.
+# Build, scan, push to GHCR. Flux sees the new main-<sha7>-<unix-ts> tag and opens a PR in
+# gh:tomr1233/expressnext-k8s; merging that PR is the deploy. Pull requests build and scan only.
 name: build
 
 on:
