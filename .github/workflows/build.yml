@@ -1,0 +1,62 @@
+# Build, scan, push to GHCR. Flux sees the new main-<sha7>-<unix-ts> tag and opens a PR in
+# gh:tomr1233/expressnext-k8s; merging that PR is the deploy. Pull requests build and scan only.
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/tomr1233/intake-form-api
+  GO_IMAGE: golang:1.26.10-alpine3.24@sha256:27f2d3b83cfc5803c8078f8e730af0f7c431bf067afaec8f60a36fb763187cba
+  # Trivy runs from its image, pinned by digest: trivy-action's tags were hijacked in March 2026.
+  TRIVY_IMAGE: aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write     # push to ghcr.io/tomr1233/intake-form-api with GITHUB_TOKEN; no stored token
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Tag
+        id: tag
+        run: echo "tag=main-${GITHUB_SHA::7}-$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: docker run --rm -v "$PWD:/src:ro" -w /src -e GOFLAGS=-buildvcs=false "$GO_IMAGE" go test ./...
+
+      - name: Build
+        run: |
+          docker build --pull -t "$IMAGE:${{ steps.tag.outputs.tag }}" \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" .
+
+      - name: Scan
+        run: |
+          docker save "$IMAGE:${{ steps.tag.outputs.tag }}" -o image.tar
+          docker run --rm -v "$PWD/image.tar:/image.tar:ro" "$TRIVY_IMAGE" image \
+            --input /image.tar --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed \
+            --exit-code 1 --no-progress
+
+      - name: Push
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "$IMAGE:${{ steps.tag.outputs.tag }}"
+          echo "Pushed $IMAGE:${{ steps.tag.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
