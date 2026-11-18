@@ -107,14 +107,7 @@ func Setup(ctx context.Context, serviceName, serviceVersion string) (ShutdownFun
 		return nil, false, fmt.Errorf("creating OTLP exporter: %w", err)
 	}
 
-	res, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceName(serviceName),
-			semconv.ServiceVersion(serviceVersion),
-		),
-	)
+	res, err := newResource(serviceName, serviceVersion)
 	if err != nil {
 		return nil, false, fmt.Errorf("building resource: %w", err)
 	}
@@ -193,3 +186,16 @@ func SetUsage(span trace.Span, promptTokens, completionTokens, totalTokens int) 
 	}
 }
 
+// newResource describes this service for exported spans. Our attributes are
+// schemaless so they merge with resource.Default() whatever semconv version
+// the SDK uses: with a schema URL, an otel bump that moves the SDK's semconv
+// ahead of ours makes Merge fail, and the server exit at startup.
+func newResource(serviceName, serviceVersion string) (*resource.Resource, error) {
+	return resource.Merge(
+		resource.Default(),
+		resource.NewSchemaless(
+			semconv.ServiceName(serviceName),
+			semconv.ServiceVersion(serviceVersion),
+		),
+	)
+}
